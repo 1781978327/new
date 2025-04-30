@@ -9,6 +9,7 @@ include = [
   "**/*.html",
   "**/*.css",
   "**/*.gltf",
+  "**/*.glb",
   "**/*.fbx",
   "**/*.obj",
   "**/*.mtl",
@@ -17,9 +18,6 @@ include = [
   "**/*.mp3",
   "**/*.wav",
   "**/*.json"
-]
-exclude = [
-  "mode/roamGirl copy.glb"
 ]
 
 [build]
@@ -31,9 +29,4 @@ name = "threejs-game-prod"
 
 [[rules]]
 type = "ESModule"
-globs = ["**/*.js"]
-
-[[r2_buckets]]
-binding = 'ASSETS'
-bucket_name = 'threejs-game-assets'
-preview_bucket_name = 'threejs-game-assets-dev' 
+globs = ["**/*.js"] 

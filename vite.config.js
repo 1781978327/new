@@ -19,7 +19,7 @@ export default defineConfig({
     minify: false,
     chunkSizeWarningLimit: 1000,
   },
-  base: '/threejs-game/',
+  base: '/new/',
   publicDir: 'public',
   assetsInclude: ['**/*.gltf', '**/*.glb', '**/*.fbx', '**/*.obj', '**/*.mtl', '**/*.jpg', '**/*.png', '**/*.mp3', '**/*.wav'],
   plugins: [
@@ -27,7 +27,7 @@ export default defineConfig({
       name: 'copy-assets',
       async buildStart() {
         try {
-          const resourceDirs = ['images', 'data', 'js'];
+          const resourceDirs = ['images', 'data', 'js', 'mode'];
           for (const dir of resourceDirs) {
             if (await import('fs').then(fs => fs.existsSync(dir))) {
               await copy(dir, `dist/${dir}`);

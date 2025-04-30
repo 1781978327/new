@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>3D 场景</title>
+    <style>
+        body { margin: 0; }
+        #container { width: 100vw; height: 100vh; }
+        #map-container { 
+            width: 100vw; 
+            height: 100vh; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            z-index: 1;
+        }
+        #three-container { 
+            width: 100vw; 
+            height: 100vh; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            display: none; 
+            z-index: 2;
+        }
+        #error-container {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            z-index: 1000;
+            max-width: 80%;
+            max-height: 80%;
+            overflow: auto;
+        }
+        .custom-marker {
+            width: 4vw;
+            height: 4vw;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .custom-marker:hover {
+            transform: scale(1.1);
+        }
+        #tip-box {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 18px;
+            z-index: 2000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            font-family: "微软雅黑", Arial, sans-serif;
+        }
+    </style>
+    <!-- 添加高德地图安全域名配置 -->
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode: '9732610363d21616607c16cabf9c4fe4',
+            serviceHost: 'http://localhost:3000'
+        };
+        
+        // 添加错误处理
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('全局错误:', message);
+            console.error('错误来源:', source);
+            console.error('行号:', lineno);
+            console.error('列号:', colno);
+            console.error('错误对象:', error);
+            
+            const errorContainer = document.getElementById('error-container');
+            if (errorContainer) {
+                errorContainer.innerHTML += `
+                    <div style="margin-bottom: 10px;">
+                        <div style="color: #ff6b6b;">错误信息: ${message}</div>
+                        <div style="color: #4ecdc4;">文件: ${source}</div>
+                        <div style="color: #45b7d1;">行号: ${lineno}</div>
+                        <div style="color: #96ceb4;">列号: ${colno}</div>
+                        <div style="color: #ffeead;">堆栈: ${error?.stack || '无'}</div>
+                    </div>
+                `;
+            }
+        };
+    </script>
+</head>
+<body>
+    <div id="map-container"></div>
+    <div id="three-container"></div>
+    <div id="error-container"></div>
+    <div id="tip-box">点击地图上的怪物图标进入对战</div>
+
+    <!-- 加载 Three.js 核心库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- 加载 Three.js 扩展 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
+    <!-- 添加 fflate 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.7.4/umd/index.min.js"></script>
+    
+    <!-- 加载高德地图 -->
+    <script type="text/javascript">
+        // 添加地图加载完成回调
+        window.onload = function() {
+            console.log('页面加载完成，开始初始化地图...');
+            
+            // 检查 AMap 对象是否加载成功
+            if (typeof AMap === 'undefined') {
+                console.error('高德地图 API 未加载成功');
+                return;
+            }
+            
+            try {
+                // 创建地图实例
+                const map = new AMap.Map('map-container', {
+                    zoom: 15,
+                    center: [116.397428, 39.90923],
+                    viewMode: '3D',
+                    pitch: 45
+                });
+                
+                console.log('地图实例创建成功');
+                
+                // 创建自定义标记
+                const markers = [
+                    {
+                        position: [116.397428, 39.90923], // 北京天安门
+                        image: './images/怪物1.png'
+                    },
+                    {
+                        position: [116.407428, 39.91923], // 天安门东北方向
+                        image: './images/怪物2.png'
+                    },
+                    {
+                        position: [116.387428, 39.89923], // 天安门西南方向
+                        image: './images/怪物3.png'
+                    }
+                ];
+                
+                // 创建并添加所有标记
+                markers.forEach((markerData, index) => {
+                    const marker = new AMap.Marker({
+                        position: markerData.position,
+                        content: `<img src="${markerData.image}" class="custom-marker">`,
+                        offset: new AMap.Pixel(-2, -2),
+                        zIndex: 100 + index
+                    });
+                    
+                    // 将标记添加到地图
+                    map.add(marker);
+                    
+                    // 点击标记时切换到 Three.js 场景
+                    marker.on('click', () => {
+                        document.getElementById('map-container').style.display = 'none';
+                        document.getElementById('three-container').style.display = 'block';
+                        // 触发 Three.js 场景初始化
+                        window.dispatchEvent(new Event('initThreeScene'));
+                        // 隐藏提示框
+                        document.getElementById('tip-box').style.display = 'none';
+                    });
+                });
+                
+                console.log('地图初始化完成');
+            } catch (error) {
+                console.error('地图初始化失败:', error);
+            }
+        };
+    </script>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=9732610363d21616607c16cabf9c4fe4&plugin=AMap.Scale,AMap.ToolBar"></script>
+
+    <!-- 加载项目脚本 -->
+    <script type="module" src="./base.js"></script>
+    <script type="module" src="./cube.js"></script>
+    <script type="module" src="./building.js"></script>
+    <script type="module" src="./controls.js"></script>
+    <script type="module" src="./character.js"></script>
+    <script type="module" src="./enemy.js"></script>
+    <script type="module" src="./yunying.js"></script>
+    <script type="module" src="./grenade.js"></script>
+    <script type="module" src="./bullet.js"></script>
+    <script type="module" src="./scene.js"></script>
+</body>
+</html>

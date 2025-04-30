@@ -1,0 +1,38 @@
+name = "threejs-game"
+main = "_worker.js"
+compatibility_date = "2024-04-30"
+
+[site]
+bucket = "./dist"
+include = [
+  "**/*.js",
+  "**/*.html",
+  "**/*.css",
+  "**/*.gltf",
+  "**/*.glb",
+  "**/*.fbx",
+  "**/*.obj",
+  "**/*.mtl",
+  "**/*.jpg",
+  "**/*.png",
+  "**/*.mp3",
+  "**/*.wav",
+  "**/*.json"
+]
+
+[build]
+command = "npm run build"
+watch_dir = "build"
+
+[env.production]
+name = "threejs-game-prod"
+
+[[rules]]
+type = "ESModule"
+globs = ["**/*.js"]
+
+# 添加 R2 存储配置
+[[r2_buckets]]
+binding = 'ASSETS'
+bucket_name = 'threejs-game-assets'
+preview_bucket_name = 'threejs-game-assets-dev' 

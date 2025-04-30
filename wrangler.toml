@@ -1,4 +1,4 @@
-name = "threejs-game"
+name = "threejs-game2"
 main = "_worker.js"
 compatibility_date = "2024-04-30"
 

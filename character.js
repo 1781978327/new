@@ -1,12 +1,10 @@
+import * as THREE from 'three';
 import Base from './base.js';
+import { CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 
 class Character extends Base {
     constructor(options = {}) {
         super();
-        this.modelPath = options.modelPath || './mode/roamGirl.glb';
-        this.gunModelPath = options.gunModelPath || './mode/Gun.obj';
-        this.gunMaterialPath = options.gunMaterialPath || './mode/Gun.mtl';
-        this.gunTexturePath = options.gunTexturePath || './mode/Gun.png';
         this.position = options.position || { x: 0, y: 0, z: 0 };
         this.scale = options.scale || { x: 10, y: 10, z: 10 };
         this.rotation = options.rotation || { x: 0, y: 0, z: 0 };
@@ -21,7 +19,6 @@ class Character extends Base {
         this.isRotating = false;
         this.isInitialized = false;
         this.initPromise = null;
-        this.gun = null;
         this.camera = null;
         
         // 添加血条相关属性
@@ -29,7 +26,7 @@ class Character extends Base {
         this.currentHealth = this.maxHealth;
         this.healthBar = null;
         this.healthBarElement = null;
-        this.lastHealthDecreaseTime = Date.now(); // 添加最后减血时间
+        this.lastHealthDecreaseTime = Date.now();
         
         this.init();
     }
@@ -43,165 +40,42 @@ class Character extends Base {
         // 创建新的初始化Promise
         this.initPromise = (async () => {
             try {
-                console.log('开始加载人物模型:', this.modelPath);
+                console.log('开始创建人物方块...');
                 
-            // 创建 GLTF 加载器
-            const loader = new THREE.GLTFLoader();
-            
-            // 加载模型
-            const gltf = await new Promise((resolve, reject) => {
-                loader.load(
-                    this.modelPath,
-                        (gltf) => {
-                            console.log('人物模型加载成功，动画数量:', gltf.animations ? gltf.animations.length : 0);
-                            if (gltf.animations && gltf.animations.length > 0) {
-                                console.log('可用动画列表:', gltf.animations.map(anim => anim.name));
-                            }
-                            // 添加延迟，确保模型完全加载
-                            setTimeout(() => {
-                                resolve(gltf);
-                            }, 2000);
-                        },
-                        (xhr) => {
-                            const percentComplete = (xhr.loaded / xhr.total) * 100;
-                            console.log('模型加载进度:', percentComplete.toFixed(2) + '%');
-                        },
-                        (error) => {
-                            console.error('加载人物模型失败:', error);
-                            reject(error);
-                        }
-                );
-            });
-
-                // 确保模型加载完成
-                if (!gltf || !gltf.scene) {
-                    throw new Error('模型加载不完整');
-                }
-
-                console.log('开始设置模型属性...');
-
-            // 设置模型
-            this.instance = gltf.scene;
+                // 创建方块几何体
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 }); // 使用绿色区分
+                this.instance = new THREE.Mesh(geometry, material);
                 
-                // 检查模型是否包含骨骼
-                let hasSkeleton = false;
-                this.instance.traverse((child) => {
-                    if (child.isSkinnedMesh) {
-                        hasSkeleton = true;
-                        console.log('模型包含骨骼系统');
-                    }
-                });
+                // 设置位置
+                this.setPosition(this.position.x, this.position.y, this.position.z);
+                console.log('方块位置设置完成:', this.position);
                 
-                if (!hasSkeleton) {
-                    console.warn('模型不包含骨骼系统，可能无法播放动画');
-                }
-            
-            // 设置位置
-            this.setPosition(this.position.x, this.position.y, this.position.z);
-                console.log('模型位置设置完成:', this.position);
-            
-            // 设置缩放
-            this.setScale(this.scale.x, this.scale.y, this.scale.z);
-                console.log('模型缩放设置完成:', this.scale);
-            
-            // 设置旋转
-            this.setRotation(this.rotation.x, this.rotation.y, this.rotation.z);
-                console.log('模型旋转设置完成:', this.rotation);
+                // 设置缩放
+                this.setScale(this.scale.x, this.scale.y, this.scale.z);
+                console.log('方块缩放设置完成:', this.scale);
+                
+                // 设置旋转
+                this.setRotation(this.rotation.x, this.rotation.y, this.rotation.z);
+                console.log('方块旋转设置完成:', this.rotation);
 
-            // 遍历模型中的所有网格
-                let meshCount = 0;
-            this.instance.traverse((child) => {
-                if (child.isMesh) {
-                        meshCount++;
-                    // 启用阴影
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
-                console.log('模型网格数量:', meshCount);
+                // 启用阴影
+                this.instance.castShadow = true;
+                this.instance.receiveShadow = true;
 
-            // 创建碰撞盒
-            this.boundingBox = new THREE.Box3().setFromObject(this.instance);
+                // 创建碰撞盒
+                this.boundingBox = new THREE.Box3().setFromObject(this.instance);
                 console.log('碰撞盒创建完成');
-
-            // 设置动画
-            if (gltf.animations && gltf.animations.length) {
-                    try {
-                        console.log('开始设置动画...');
-                this.mixer = new THREE.AnimationMixer(this.instance);
-                gltf.animations.forEach((clip) => {
-                            if (clip && clip.name) {
-                    const action = this.mixer.clipAction(clip);
-                    this.animations[clip.name] = action;
-                                console.log('添加动画:', clip.name);
-                            }
-                });
-                // 默认播放第一个动画
-                        if (gltf.animations[0] && gltf.animations[0].name) {
-                    this.playAnimation(gltf.animations[0].name);
-                            console.log('播放默认动画:', gltf.animations[0].name);
-                }
-                    } catch (error) {
-                        console.error('设置人物动画失败:', error);
-                    }
-                } else {
-                    console.warn('模型没有动画数据');
-                }
-
-                // 加载枪械模型
-                console.log('开始加载枪械模型:', this.gunMaterialPath);
-                const mtlLoader = new THREE.MTLLoader();
-                const objLoader = new THREE.OBJLoader();
                 
-                // 设置基础路径
-                const basePath = './mode/';
-                mtlLoader.setPath(basePath);
-                objLoader.setPath(basePath);
-
-                // 加载材质
-                const materials = await new Promise((resolve, reject) => {
-                    mtlLoader.load(
-                        'Gun.mtl',
-                        (materials) => {
-                            materials.preload();
-                            resolve(materials);
-                        },
-                        undefined,
-                        reject
-                    );
-                });
-
-                // 加载模型
-                const gunModel = await new Promise((resolve, reject) => {
-                    objLoader.setMaterials(materials);
-                    objLoader.load(
-                        'Gun.obj',
-                        (object) => {
-                            resolve(object);
-                        },
-                        undefined,
-                        reject
-                    );
-                });
-
-                // 设置枪械位置和旋转
-                gunModel.scale.set(0.1, 0.1, 0.1);
-                gunModel.position.set(0.2, -0.2, 0.5);
-                gunModel.rotation.set(0, Math.PI / 2, 0);
-
-                // 将枪械附加到角色上
-                this.instance.add(gunModel);
-                this.gun = gunModel;
-                console.log('枪械模型加载并附加完成');
-
                 // 标记初始化完成
                 this.isInitialized = true;
-                console.log('角色初始化完成');
+                console.log('人物方块创建完成');
                 
-                // 在模型加载完成后创建血条
+                // 创建血条
                 this.createHealthBar();
+                
             } catch (error) {
-                console.error('加载角色模型失败:', error);
+                console.error('创建人物方块失败:', error);
                 this.isInitialized = false;
                 throw error;
             }
@@ -298,11 +172,6 @@ class Character extends Base {
         // 应用持续旋转
         if (this.isRotating && this.instance) {
             this.instance.rotation.y += this.rotationSpeed * delta;
-        }
-
-        // 更新枪械位置（如果需要）
-        if (this.gun) {
-            // 这里可以添加枪械的动画或位置更新逻辑
         }
 
         // 更新血条位置，使其始终面向相机
@@ -405,7 +274,7 @@ class Character extends Base {
         healthBarContainer.appendChild(this.healthBarElement);
 
         // 创建CSS3D对象
-        this.healthBar = new THREE.CSS3DObject(healthBarContainer);
+        this.healthBar = new CSS3DObject(healthBarContainer);
         this.healthBar.position.set(0, 2, 0); // 在模型上方2个单位
         this.healthBar.scale.set(0.01, 0.01, 0.01); // 缩放以适应场景
 

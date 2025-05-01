@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import Base from './base.js';
 
-class Grenade {
+class Grenade extends Base {
     constructor(scene, character) {
+        super();
         this.scene = scene;
         this.character = character;
         this.grenade = null;

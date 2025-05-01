@@ -2,10 +2,6 @@ import * as THREE from 'three';
 
 class Bullet {
     constructor(scene, character) {
-        if (!scene || !character) {
-            console.error('Bullet: 场景和角色参数不能为空');
-            return;
-        }
         this.scene = scene;
         this.character = character;
         this.bullets = [];
@@ -23,10 +19,6 @@ class Bullet {
     }
 
     createBullets() {
-        if (!this.scene) {
-            console.error('Bullet: 场景未初始化');
-            return;
-        }
         // 创建多个子弹
         for (let i = 0; i < this.bulletCount; i++) {
             const geometry = new THREE.SphereGeometry(0.5, 16, 16);
@@ -56,53 +48,44 @@ class Bullet {
     }
 
     fire() {
-        if (!this.character || !this.character.instance) {
-            console.error('Bullet: 角色未初始化');
-            return;
-        }
         if (this.isFiring) return;
         
         this.isFiring = true;
         this.bullets.forEach((bullet, index) => {
             if (!bullet.userData.isFired) {
-                try {
-                    // 获取人物当前朝向
-                    const characterDirection = new THREE.Vector3(0, 0, 1);
-                    characterDirection.applyQuaternion(this.character.instance.quaternion);
-                    
-                    // 计算每个子弹的发射角度（45度间隔）
-                    const angle = (index * Math.PI * 2) / this.bulletCount;
-                    const direction = new THREE.Vector3(
-                        Math.sin(angle),
-                        0,
-                        Math.cos(angle)
-                    );
-                    
-                    // 设置发射方向
-                    bullet.userData.direction.copy(direction).normalize();
-                    bullet.userData.isFired = true;
-                    
-                    // 设置初始位置（在人物前方）
-                    const startPosition = this.character.instance.position.clone();
-                    startPosition.add(characterDirection.multiplyScalar(2));  // 从人物前方2个单位开始
-                    startPosition.y += this.height;
-                    bullet.position.copy(startPosition);
-                    
-                    // 让子弹朝向发射方向
-                    bullet.lookAt(
-                        bullet.position.x + bullet.userData.direction.x,
-                        bullet.position.y + bullet.userData.direction.y,
-                        bullet.position.z + bullet.userData.direction.z
-                    );
-                    
-                    console.log(`发射子弹${index}:`, {
-                        position: bullet.position,
-                        direction: bullet.userData.direction
-                    });
-                } catch (error) {
-                    console.error(`发射子弹${index}时出错:`, error);
-                    this.resetBullet(bullet, index);
-                }
+                // 获取人物当前朝向
+                const characterDirection = new THREE.Vector3(0, 0, 1);
+                characterDirection.applyQuaternion(this.character.instance.quaternion);
+                
+                // 计算每个子弹的发射角度（45度间隔）
+                const angle = (index * Math.PI * 2) / this.bulletCount;
+                const direction = new THREE.Vector3(
+                    Math.sin(angle),
+                    0,
+                    Math.cos(angle)
+                );
+                
+                // 设置发射方向
+                bullet.userData.direction.copy(direction).normalize();
+                bullet.userData.isFired = true;
+                
+                // 设置初始位置（在人物前方）
+                const startPosition = this.character.instance.position.clone();
+                startPosition.add(characterDirection.multiplyScalar(2));  // 从人物前方2个单位开始
+                startPosition.y += this.height;
+                bullet.position.copy(startPosition);
+                
+                // 让子弹朝向发射方向
+                bullet.lookAt(
+                    bullet.position.x + bullet.userData.direction.x,
+                    bullet.position.y + bullet.userData.direction.y,
+                    bullet.position.z + bullet.userData.direction.z
+                );
+                
+                console.log(`发射子弹${index}:`, {
+                    position: bullet.position,
+                    direction: bullet.userData.direction
+                });
             }
         });
     }
@@ -162,90 +145,71 @@ class Bullet {
     }
 
     update() {
-        if (!this.character || !this.character.instance) {
-            console.error('Bullet: 角色未初始化');
-            return;
-        }
-        
         this.angle += this.speed;
         
         // 更新每个子弹的位置
         this.bullets.forEach((bullet, index) => {
-            try {
-                if (!bullet.userData.isFired) {
-                    // 未发射的子弹继续环绕
-                    const x = Math.cos(this.angle + (index * Math.PI * 2 / this.bulletCount)) * this.radius;
-                    const z = Math.sin(this.angle + (index * Math.PI * 2 / this.bulletCount)) * this.radius;
-                    
-                    bullet.position.x = this.character.instance.position.x + x;
-                    bullet.position.y = this.character.instance.position.y + this.height;
-                    bullet.position.z = this.character.instance.position.z + z;
-                } else {
-                    // 已发射的子弹向前移动
-                    const moveStep = bullet.userData.direction.clone().multiplyScalar(bullet.userData.speed);
-                    bullet.position.add(moveStep);
-                    
-                    // 检查是否击中建筑物
-                    if (this.buildingManager && this.checkBuildingCollision(bullet)) {
-                        console.log('子弹击中建筑物');
-                        this.resetBullet(bullet, index);
-                        return;
-                    }
-                    
-                    // 检查是否击中敌人
-                    if (this.checkEnemyCollision(bullet)) {
-                        console.log('子弹击中敌人');
-                        this.resetBullet(bullet, index);
-                        return;
-                    }
-                    
-                    // 检查是否超出范围
-                    const distance = bullet.position.distanceTo(this.character.instance.position);
-                    if (distance > 100) {  // 超出100个单位后重置
-                        console.log('子弹超出范围');
-                        this.resetBullet(bullet, index);
-                    }
+            if (!bullet.userData.isFired) {
+                // 未发射的子弹继续环绕
+                const x = Math.cos(this.angle + (index * Math.PI * 2 / this.bulletCount)) * this.radius;
+                const z = Math.sin(this.angle + (index * Math.PI * 2 / this.bulletCount)) * this.radius;
+                
+                bullet.position.x = this.character.instance.position.x + x;
+                bullet.position.y = this.character.instance.position.y + this.height;
+                bullet.position.z = this.character.instance.position.z + z;
+            } else {
+                // 已发射的子弹向前移动
+                const moveStep = bullet.userData.direction.clone().multiplyScalar(bullet.userData.speed);
+                bullet.position.add(moveStep);
+                
+                // 检查是否击中建筑物
+                if (this.buildingManager && this.checkBuildingCollision(bullet)) {
+                    console.log('子弹击中建筑物');
+                    this.resetBullet(bullet, index);
+                    return;
                 }
-            } catch (error) {
-                console.error(`更新子弹${index}时出错:`, error);
-                this.resetBullet(bullet, index);
+                
+                // 检查是否击中敌人
+                if (this.checkEnemyCollision(bullet)) {
+                    console.log('子弹击中敌人');
+                    this.resetBullet(bullet, index);
+                    return;
+                }
+                
+                // 检查是否超出范围
+                const distance = bullet.position.distanceTo(this.character.instance.position);
+                if (distance > 100) {  // 超出100个单位后重置
+                    console.log('子弹超出范围');
+                    this.resetBullet(bullet, index);
+                }
             }
         });
     }
 
     resetBullet(bullet, index) {
-        if (!this.character || !this.character.instance) {
-            console.error('Bullet: 角色未初始化');
-            return;
-        }
+        bullet.userData.isFired = false;
+        this.isFiring = false;
         
-        try {
-            bullet.userData.isFired = false;
-            this.isFiring = false;
-            
-            // 重置子弹位置到环绕轨道
-            const bulletAngle = this.angle + (index * (Math.PI * 2) / this.bulletCount);
-            const x = Math.cos(bulletAngle) * this.radius;
-            const z = Math.sin(bulletAngle) * this.radius;
-            
-            bullet.position.x = this.character.instance.position.x + x;
-            bullet.position.y = this.character.instance.position.y + this.height;
-            bullet.position.z = this.character.instance.position.z + z;
-            
-            // 重置子弹朝向
-            bullet.lookAt(
-                this.character.instance.position.x,
-                this.character.instance.position.y + this.height,
-                this.character.instance.position.z
-            );
-            
-            console.log('重置子弹:', {
-                position: bullet.position,
-                index: index
-            });
-        } catch (error) {
-            console.error(`重置子弹${index}时出错:`, error);
-        }
+        // 重置子弹位置到环绕轨道
+        const bulletAngle = this.angle + (index * (Math.PI * 2) / this.bulletCount);
+        const x = Math.cos(bulletAngle) * this.radius;
+        const z = Math.sin(bulletAngle) * this.radius;
+        
+        bullet.position.x = this.character.instance.position.x + x;
+        bullet.position.y = this.character.instance.position.y + this.height;
+        bullet.position.z = this.character.instance.position.z + z;
+        
+        // 重置子弹朝向
+        bullet.lookAt(
+            this.character.instance.position.x,
+            this.character.instance.position.y + this.height,
+            this.character.instance.position.z
+        );
+        
+        console.log('重置子弹:', {
+            position: bullet.position,
+            index: index
+        });
     }
 
     remove() {

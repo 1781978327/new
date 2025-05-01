@@ -1,9 +1,13 @@
+import * as THREE from 'three';
+import { CSS3DObject } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import Base from './base.js';
+
+// 移除延迟导入，改为直接导入
+import { BuildingManager } from './building.js';
 
 class Enemy extends Base {
     constructor(options = {}) {
         super();
-        this.modelPath = options.modelPath || './mode/roamGirl.glb'; // 可以使用不同的模型
         this.position = options.position || { x: 0, y: 0, z: 0 };
         this.scale = options.scale || { x: 10, y: 10, z: 10 };
         this.rotation = options.rotation || { x: 0, y: 0, z: 0 };
@@ -13,13 +17,14 @@ class Enemy extends Base {
         this.previousAction = null;
         this.boundingBox = null;
         this.moveSpeed = options.moveSpeed || 5.0;
-        this.patrolRadius = options.patrolRadius || 500;  // 修改为地图范围
+        this.patrolRadius = options.patrolRadius || 500;
         this.patrolCenter = options.patrolCenter || { x: 0, y: 0, z: 0 };
         this.targetPosition = null;
         this.changeDirectionTime = 0;
         this.directionChangeInterval = 8 + Math.random() * 7;
-        this.isInitialized = false; // 添加初始化状态标志
-        this.initPromise = null; // 添加初始化Promise
+        this.isInitialized = false;
+        this.initPromise = null;
+        this.buildingManager = null;
         
         // 添加血条相关属性
         this.maxHealth = 100;
@@ -27,21 +32,21 @@ class Enemy extends Base {
         this.healthBar = null;
         this.healthBarElement = null;
         this.camera = null;
-        this.lastHealthDecreaseTime = Date.now(); // 初始化最后减血时间
+        this.lastHealthDecreaseTime = Date.now();
         
         // 添加子弹相关属性
         this.bullets = [];
         this.angle = 0;
-        this.radius = 5;  // 环绕半径
-        this.height = 2;  // 腰部高度
-        this.speed = 0.1;  // 环绕速度
-        this.bulletCount = 8;  // 8颗子弹
-        this.isFiring = false;  // 是否正在发射
-        this.fireSpeed = 1.5;   // 发射速度
-        this.fireInterval = 3000; // 3秒发射一次
+        this.radius = 5;
+        this.height = 2;
+        this.speed = 0.1;
+        this.bulletCount = 8;
+        this.isFiring = false;
+        this.fireSpeed = 1.5;
+        this.fireInterval = 3000;
         this.lastFireTime = 0;
-        this.bulletDamage = 5; // 敌人子弹伤害值
-        this.scene = null; // 添加场景引用
+        this.bulletDamage = 5;
+        this.scene = null;
         
         this.init();
     }
@@ -60,6 +65,12 @@ class Enemy extends Base {
         }
     }
 
+    // 设置建筑物管理器
+    async setBuildingManager(manager) {
+        this.buildingManager = manager;
+        console.log('已设置建筑物管理器');
+    }
+
     // 设置相机
     setCamera(camera) {
         this.camera = camera;
@@ -74,113 +85,45 @@ class Enemy extends Base {
         // 创建新的初始化Promise
         this.initPromise = (async () => {
             try {
-                console.log('开始加载敌人模型:', this.modelPath);
+                console.log('开始创建敌人方块...');
                 
-                // 创建 GLTF 加载器
-                const loader = new THREE.GLTFLoader();
-                
-                // 加载模型
-                const gltf = await new Promise((resolve, reject) => {
-                    loader.load(
-                        this.modelPath,
-                        (gltf) => {
-                            console.log('敌人模型加载成功，动画数量:', gltf.animations ? gltf.animations.length : 0);
-                            if (gltf.animations && gltf.animations.length > 0) {
-                                console.log('可用动画列表:', gltf.animations.map(anim => anim.name));
-                            }
-                            // 添加延迟，确保模型完全加载
-                            setTimeout(() => {
-                                resolve(gltf);
-                            }, 2000);
-                        },
-                        (xhr) => {
-                            const percentComplete = (xhr.loaded / xhr.total) * 100;
-                            console.log('模型加载进度:', percentComplete.toFixed(2) + '%');
-                        },
-                        (error) => {
-                            console.error('加载敌人模型失败:', error);
-                            reject(error);
-                        }
-                    );
-                });
-
-                // 确保模型加载完成
-                if (!gltf || !gltf.scene) {
-                    throw new Error('模型加载不完整');
-                }
-
-                console.log('开始设置模型属性...');
-                
-                // 设置模型
-                this.instance = gltf.scene;
+                // 创建方块几何体
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+                this.instance = new THREE.Mesh(geometry, material);
                 
                 // 设置位置
                 this.setPosition(this.position.x, this.position.y, this.position.z);
-                console.log('模型位置设置完成:', this.position);
+                console.log('方块位置设置完成:', this.position);
                 
                 // 设置缩放
                 this.setScale(this.scale.x, this.scale.y, this.scale.z);
-                console.log('模型缩放设置完成:', this.scale);
+                console.log('方块缩放设置完成:', this.scale);
                 
                 // 设置旋转
                 this.setRotation(this.rotation.x, this.rotation.y, this.rotation.z);
-                console.log('模型旋转设置完成:', this.rotation);
+                console.log('方块旋转设置完成:', this.rotation);
 
-                // 遍历模型中的所有网格
-                let meshCount = 0;
-                this.instance.traverse((child) => {
-                    if (child.isMesh) {
-                        meshCount++;
-                        // 启用阴影
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
-                console.log('模型网格数量:', meshCount);
+                // 启用阴影
+                this.instance.castShadow = true;
+                this.instance.receiveShadow = true;
 
                 // 创建碰撞盒
                 this.boundingBox = new THREE.Box3().setFromObject(this.instance);
                 console.log('碰撞盒创建完成');
-
-                // 设置动画
-                if (gltf.animations && gltf.animations.length) {
-                    try {
-                        console.log('开始设置动画...');
-                        this.mixer = new THREE.AnimationMixer(this.instance);
-                        gltf.animations.forEach((clip) => {
-                            if (clip && clip.name) {
-                                const action = this.mixer.clipAction(clip);
-                                this.animations[clip.name] = action;
-                                console.log('添加动画:', clip.name);
-                            }
-                        });
-                        // 默认播放第一个动画
-                        if (gltf.animations[0] && gltf.animations[0].name) {
-                            this.playAnimation(gltf.animations[0].name);
-                            console.log('播放默认动画:', gltf.animations[0].name);
-                        }
-                    } catch (error) {
-                        console.error('设置敌人动画失败:', error);
-                    }
-                } else {
-                    console.warn('模型没有动画数据');
-                }
-
-                // 再次添加延迟，确保所有设置都完成
-                await new Promise(resolve => setTimeout(resolve, 1000));
 
                 // 设置初始巡逻目标
                 this.setNewPatrolTarget();
                 
                 // 标记初始化完成
                 this.isInitialized = true;
-                console.log('敌人初始化完成，开始巡逻');
+                console.log('敌人方块创建完成');
                 
-                // 在模型加载完成后创建血条
+                // 创建血条
                 this.createHealthBar();
                 
             } catch (error) {
-                console.error('加载敌人模型失败:', error);
+                console.error('创建敌人方块失败:', error);
                 this.isInitialized = false;
                 throw error;
             }
@@ -420,8 +363,6 @@ class Enemy extends Base {
         );
 
         const distance = direction.length();
-       // console.log('到目标点的距离:', distance);
-
         if (distance < 0.5 || this.changeDirectionTime >= this.directionChangeInterval) {
             console.log('设置新的巡逻目标');
             this.setNewPatrolTarget();
@@ -446,12 +387,31 @@ class Enemy extends Base {
         // 平滑旋转
         this.instance.rotation.y = targetRotation;
 
-        // 计算移动量 - 增加移动量
-        const moveAmount = direction.multiplyScalar(this.moveSpeed * delta * 60); // 乘以60来补偿delta时间
-        //console.log('移动量:', moveAmount);
+        // 保存当前位置
+        const oldPosition = this.instance.position.clone();
 
-        // 移动
+        // 计算移动量
+        const moveAmount = direction.multiplyScalar(this.moveSpeed * delta * 60);
+
+        // 尝试移动
         this.instance.position.add(moveAmount);
+
+        // 检查碰撞
+        if (this.buildingManager) {
+            // 更新碰撞盒
+            this.boundingBox.setFromObject(this.instance);
+            
+            // 检查是否与建筑物碰撞
+            if (this.buildingManager.checkCollisions(this.boundingBox)) {
+                // 如果发生碰撞，恢复位置
+                this.instance.position.copy(oldPosition);
+                this.boundingBox.setFromObject(this.instance);
+                
+                // 设置新的巡逻目标
+                this.setNewPatrolTarget();
+                return;
+            }
+        }
 
         // 更新碰撞盒
         if (this.boundingBox) {
@@ -500,7 +460,7 @@ class Enemy extends Base {
         healthBarContainer.appendChild(this.healthBarElement);
 
         // 创建CSS3D对象
-        this.healthBar = new THREE.CSS3DObject(healthBarContainer);
+        this.healthBar = new CSS3DObject(healthBarContainer);
         this.healthBar.position.set(0, 2, 0); // 在模型上方2个单位
         this.healthBar.scale.set(0.01, 0.01, 0.01); // 缩放以适应场景
 
@@ -564,4 +524,4 @@ class Enemy extends Base {
     }
 }
 
-export default Enemy; 
+export { Enemy }; 

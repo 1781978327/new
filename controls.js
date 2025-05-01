@@ -1,7 +1,10 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
 class Controls {
     constructor(camera, domElement) {
         // 使用全局的 OrbitControls
-        this.controls = new THREE.OrbitControls(camera, domElement);
+        this.controls = new OrbitControls(camera, domElement);
         this.init();
     }
 

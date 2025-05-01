@@ -1,4 +1,5 @@
 import Base from './base.js';
+import * as THREE from 'three';
 
 class Building extends Base {
     constructor(options = {}) {

@@ -1,13 +1,13 @@
+import * as THREE from 'three';
 import Base from './base.js';
 import Cube from './cube.js';
 import { BuildingManager } from './building.js';
 import Controls from './controls.js';
 import Character from './character.js';
-import Enemy from './enemy.js';
-import YunYing from './yunying.js';
+import { Enemy } from './enemy.js';
 import Grenade from './grenade.js';
 import Bullet from './bullet.js';
-import storage from './app.js';
+import { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 
 // 场景管理类
 class SceneManager {
@@ -20,7 +20,6 @@ class SceneManager {
         this.controls = null;
         this.character = null;
         this.enemies = []; // 存储敌人实例
-        this.yunying = null; // 云樱实例
         this.clock = new THREE.Clock();
         this.keys = {}; // 存储按键状态
         this.cameraOffset = new THREE.Vector3(0, 30, 50); // 相机相对于人物的偏移
@@ -88,7 +87,7 @@ class SceneManager {
             document.body.appendChild(this.renderer.domElement);
 
             // 创建CSS3D渲染器
-            this.cssRenderer = new THREE.CSS3DRenderer();
+            this.cssRenderer = new CSS3DRenderer();
             this.cssRenderer.setSize(window.innerWidth, window.innerHeight);
             this.cssRenderer.domElement.style.position = 'absolute';
             this.cssRenderer.domElement.style.top = '0';
@@ -114,7 +113,8 @@ class SceneManager {
             this.character = new Character({
                 position: { x: 0, y: 0, z: 0 },
                 scale: { x: 10, y: 10, z: 10 },
-                rotation: { x: 0, y: 0, z: 0 }
+                rotation: { x: 0, y: 0, z: 0 },
+                useBox: true  // 添加标志使用方块
             });
             await this.character.init();
             this.character.addToScene(this.scene);
@@ -123,15 +123,6 @@ class SceneManager {
 
             // 加载保存的位置
             await this.loadModelPosition();
-
-            // 创建云樱
-            this.yunying = new YunYing({
-                position: { x: 0, y: 0, z: 0 },
-                scale: { x: 1, y: 1, z: 1 },
-                rotation: { x: 0, y: 0, z: 0 },
-                scene: this.scene
-            });
-            await this.yunying.init();
 
             // 创建敌人
             await this.createEnemies();
@@ -172,10 +163,9 @@ class SceneManager {
         console.log('开始创建敌人...');
         // 创建一个敌人
         this.enemy = new Enemy({
-            modelPath: './mode/roamGirl.glb',
             position: { x: 0, y: 0, z: 0 },
             scale: { x: 10, y: 10, z: 10 },
-            moveSpeed: 0.5,  // 降低移动速度
+            moveSpeed: 0.5,
             patrolRadius: 500
         });
         
@@ -183,6 +173,7 @@ class SceneManager {
         const sceneWithCharacter = this.scene;
         sceneWithCharacter.character = this.character; // 确保场景对象中包含玩家引用
         this.enemy.setScene(sceneWithCharacter);
+        this.enemy.setBuildingManager(this.buildingManager); // 设置建筑物管理器
         
         // 加载敌人模型
         await this.enemy.init().then(() => {
@@ -212,12 +203,6 @@ class SceneManager {
             // 添加保存控制
             if (event.ctrlKey && key === 'c') {  // 按Ctrl+C保存坐标
                 this.saveModelPositionToFile();
-            }
-
-            // 添加空格键发射子弹
-            if (event.code === 'Space' && this.bullet) {
-                console.log('发射子弹');
-                this.bullet.fire();
             }
         });
 
@@ -258,6 +243,7 @@ class SceneManager {
                         z: scale.z
                     }
                 };
+                console.log('保存角色位置:', position);
             }
 
             // 保存所有敌人坐标
@@ -286,9 +272,15 @@ class SceneManager {
                 }
             });
 
-            // 使用 storage 保存数据
-            storage.saveModelData(modelData);
-            console.log('模型数据已保存');
+            // 使用 Electron 的 API 保存文件
+            if (window.electron) {
+                window.electron.saveModelData(JSON.stringify(modelData, null, 2));
+                console.log('模型数据已保存到文件');
+            } else {
+                console.log('模型数据:', modelData);
+                // 如果不在 Electron 环境中，使用 localStorage 作为备选
+                localStorage.setItem('modelData', JSON.stringify(modelData));
+            }
         } catch (error) {
             console.error('保存模型数据失败:', error);
         }
@@ -297,55 +289,105 @@ class SceneManager {
     // 加载所有模型坐标
     async loadModelPosition() {
         try {
-            const result = storage.loadModelData();
-            if (result.success) {
-                const data = result.data;
-                
-                // 加载角色坐标
-                if (data.character && this.character) {
-                    this.character.setPosition(
-                        data.character.position.x,
-                        data.character.position.y,
-                        data.character.position.z
-                    );
-                    this.character.setRotation(
-                        data.character.rotation.x,
-                        data.character.rotation.y,
-                        data.character.rotation.z
-                    );
-                    this.character.setScale(
-                        data.character.scale.x,
-                        data.character.scale.y,
-                        data.character.scale.z
-                    );
-                }
+            if (window.electron) {
+                const result = await window.electron.loadModelData();
+                if (result.success) {
+                    const data = result.data;
+                    
+                    // 加载角色坐标
+                    if (data.character && this.character) {
+                        this.character.setPosition(
+                            data.character.position.x,
+                            data.character.position.y,
+                            data.character.position.z
+                        );
+                        this.character.setRotation(
+                            data.character.rotation.x,
+                            data.character.rotation.y,
+                            data.character.rotation.z
+                        );
+                        this.character.setScale(
+                            data.character.scale.x,
+                            data.character.scale.y,
+                            data.character.scale.z
+                        );
+                    }
 
-                // 加载敌人坐标
-                if (data.enemies && this.enemies.length > 0) {
-                    data.enemies.forEach((enemyData, index) => {
-                        if (this.enemies[index] && this.enemies[index].instance) {
-                            const enemy = this.enemies[index];
-                            enemy.instance.position.set(
-                                enemyData.position.x,
-                                enemyData.position.y,
-                                enemyData.position.z
-                            );
-                            enemy.instance.rotation.set(
-                                enemyData.rotation.x,
-                                enemyData.rotation.y,
-                                enemyData.rotation.z
-                            );
-                            enemy.instance.scale.set(
-                                enemyData.scale.x,
-                                enemyData.scale.y,
-                                enemyData.scale.z
-                            );
-                        }
-                    });
+                    // 加载敌人坐标
+                    if (data.enemies && this.enemies.length > 0) {
+                        data.enemies.forEach((enemyData, index) => {
+                            if (this.enemies[index] && this.enemies[index].instance) {
+                                const enemy = this.enemies[index];
+                                enemy.instance.position.set(
+                                    enemyData.position.x,
+                                    enemyData.position.y,
+                                    enemyData.position.z
+                                );
+                                enemy.instance.rotation.set(
+                                    enemyData.rotation.x,
+                                    enemyData.rotation.y,
+                                    enemyData.rotation.z
+                                );
+                                enemy.instance.scale.set(
+                                    enemyData.scale.x,
+                                    enemyData.scale.y,
+                                    enemyData.scale.z
+                                );
+                            }
+                        });
+                    }
+                    console.log('模型数据已从文件加载');
+                } else {
+                    console.log('没有找到保存的模型数据');
                 }
-                console.log('模型数据已加载');
             } else {
-                console.log('没有找到保存的模型数据');
+                // 如果不在 Electron 环境中，使用 localStorage 作为备选
+                const savedData = localStorage.getItem('modelData');
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    // 加载角色坐标
+                    if (data.character && this.character) {
+                        this.character.setPosition(
+                            data.character.position.x,
+                            data.character.position.y,
+                            data.character.position.z
+                        );
+                        this.character.setRotation(
+                            data.character.rotation.x,
+                            data.character.rotation.y,
+                            data.character.rotation.z
+                        );
+                        this.character.setScale(
+                            data.character.scale.x,
+                            data.character.scale.y,
+                            data.character.scale.z
+                        );
+                    }
+                    // 加载敌人坐标
+                    if (data.enemies && this.enemies.length > 0) {
+                        data.enemies.forEach((enemyData, index) => {
+                            if (this.enemies[index] && this.enemies[index].instance) {
+                                const enemy = this.enemies[index];
+                                enemy.instance.position.set(
+                                    enemyData.position.x,
+                                    enemyData.position.y,
+                                    enemyData.position.z
+                                );
+                                enemy.instance.rotation.set(
+                                    enemyData.rotation.x,
+                                    enemyData.rotation.y,
+                                    enemyData.rotation.z
+                                );
+                                enemy.instance.scale.set(
+                                    enemyData.scale.x,
+                                    enemyData.scale.y,
+                                    enemyData.scale.z
+                                );
+                            }
+                        });
+                    }
+                    console.log('模型数据已从 localStorage 加载');
+                }
             }
         } catch (error) {
             console.error('加载模型数据失败:', error);
@@ -428,9 +470,8 @@ class SceneManager {
             console.warn('场景未初始化，跳过动画循环');
             return;
         }
-        
+
         requestAnimationFrame(this.animate.bind(this));
-        
         const delta = this.clock.getDelta();
         
         // 更新控制器
@@ -465,11 +506,6 @@ class SceneManager {
                     }
                 });
             }
-        }
-        
-        // 更新云樱
-        if (this.yunying) {
-            this.yunying.update(delta);
         }
         
         // 更新手雷

@@ -1,32 +1,21 @@
-name = "threejs-game"
+name = "3d-game"
 main = "_worker.js"
-compatibility_date = "2024-04-30"
+compatibility_date = "2024-04-28"
 
 [site]
 bucket = "./dist"
-include = [
-  "**/*.js",
-  "**/*.html",
-  "**/*.css",
-  "**/*.gltf",
-  "**/*.glb",
-  "**/*.fbx",
-  "**/*.obj",
-  "**/*.mtl",
-  "**/*.jpg",
-  "**/*.png",
-  "**/*.mp3",
-  "**/*.wav",
-  "**/*.json"
-]
 
 [build]
 command = "npm run build"
-watch_dir = "build"
+cwd = "./"
 
 [env.production]
-name = "threejs-game-prod"
+workers_dev = true
 
 [[rules]]
 type = "ESModule"
-globs = ["**/*.js"] 
+globs = ["**/*.js"]
+
+[[rules]]
+type = "Data"
+globs = ["**/*.css", "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif", "**/*.webp", "**/*.woff", "**/*.woff2", "**/*.ttf", "**/*.otf", "**/*.mp4", "**/*.webm", "**/*.ogg", "**/*.mp3", "**/*.wav"] 

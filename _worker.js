@@ -1,79 +1,81 @@
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
-    console.log('Handling request for:', url.pathname);
-    
+    console.log('请求URL:', url.pathname);
+    console.log('完整URL:', url.toString());
+
+    // 添加CORS头
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+    };
+
+    // 处理OPTIONS请求
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+      });
+    }
+
     try {
-      // 处理根路径和 index.html
-      if (url.pathname === '/' || url.pathname === '/index.html') {
-        console.log('Serving index.html');
-        const response = await env.ASSETS.fetch(new Request(new URL('/index.html', request.url)));
-        if (!response.ok) {
-          throw new Error(`Failed to fetch index.html: ${response.status}`);
-        }
-        return new Response(response.body, {
-          status: 200,
-          headers: {
-            'content-type': 'text/html;charset=UTF-8',
-            'cache-control': 'no-cache',
-            'access-control-allow-origin': '*'
-          }
+      // 处理静态文件请求
+      console.log('尝试获取资源:', url.pathname);
+      const response = await env.ASSETS.fetch(request);
+      
+      if (!response) {
+        console.log('资源未找到:', url.pathname);
+        return new Response('Not Found', { 
+          status: 404,
+          headers: corsHeaders
         });
       }
 
-      // 处理静态资源
-      console.log('Serving static asset:', url.pathname);
-      let response = await env.ASSETS.fetch(request);
-      
-      // 如果资源没找到，尝试不同的路径
-      if (!response.ok) {
-        console.log('Asset not found, trying alternative path:', url.pathname);
-        // 尝试从 assets 目录获取
-        const assetsRequest = new Request(new URL('/assets' + url.pathname, request.url));
-        response = await env.ASSETS.fetch(assetsRequest);
-        
-        // 如果还是没找到，尝试从根目录获取
-        if (!response.ok) {
-          console.log('Asset not found in assets directory, trying root path');
-          const rootRequest = new Request(new URL(url.pathname.replace('/assets/', '/'), request.url));
-          response = await env.ASSETS.fetch(rootRequest);
-        }
-      }
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch asset ${url.pathname}: ${response.status}`);
-      }
-
-      // 设置正确的 MIME 类型
+      // 设置正确的Content-Type
       const contentType = getContentType(url.pathname);
-      return new Response(response.body, {
-        status: 200,
-        headers: {
-          'content-type': contentType,
-          'access-control-allow-origin': '*',
-          'cache-control': 'public, max-age=31536000'
-        }
+      console.log('资源类型:', contentType);
+      
+      const headers = new Headers(response.headers);
+      headers.set('Content-Type', contentType);
+      headers.set('Cache-Control', 'public, max-age=31536000');
+      
+      // 添加CORS头
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        headers.set(key, value);
       });
-    } catch (e) {
-      console.error('Error handling request:', e);
-      return new Response(`Error: ${e.message}`, {
-        status: 404,
-        headers: {
-          'content-type': 'text/plain;charset=UTF-8',
-          'access-control-allow-origin': '*'
-        }
+
+      // 检查响应状态
+      if (!response.ok) {
+        console.error('资源请求失败:', response.status, response.statusText);
+        return new Response('Resource Error', {
+          status: response.status,
+          headers: corsHeaders
+        });
+      }
+
+      console.log('返回资源:', url.pathname);
+      return new Response(response.body, {
+        status: response.status,
+        headers
+      });
+    } catch (error) {
+      console.error('错误:', error);
+      return new Response('Internal Server Error', { 
+        status: 500,
+        headers: corsHeaders
       });
     }
   }
 };
 
-// 根据文件扩展名获取 MIME 类型
+// 根据文件扩展名获取Content-Type
 function getContentType(pathname) {
   const ext = pathname.split('.').pop().toLowerCase();
   const types = {
     'html': 'text/html',
-    'css': 'text/css',
     'js': 'application/javascript',
+    'css': 'text/css',
     'json': 'application/json',
     'png': 'image/png',
     'jpg': 'image/jpeg',
@@ -81,11 +83,13 @@ function getContentType(pathname) {
     'gif': 'image/gif',
     'svg': 'image/svg+xml',
     'ico': 'image/x-icon',
-    'gltf': 'model/gltf+json',
     'glb': 'model/gltf-binary',
-    'obj': 'text/plain',
-    'mtl': 'text/plain',
+    'gltf': 'model/gltf+json',
     'fbx': 'application/octet-stream',
+    'obj': 'text/plain',
+    'mp4': 'video/mp4',
+    'webm': 'video/webm',
+    'ogg': 'audio/ogg',
     'mp3': 'audio/mpeg',
     'wav': 'audio/wav'
   };

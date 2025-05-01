@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import Base from './base.js';
 
 class YunYing extends Base {
